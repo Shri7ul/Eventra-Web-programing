@@ -3,6 +3,12 @@ import { supabase, hasSupabase } from "../lib/supabase";
 
 const AuthContext = createContext(null);
 
+function getAuthRedirectBaseUrl() {
+  const configuredUrl = import.meta.env.VITE_APP_URL;
+  const baseUrl = configuredUrl || window.location.origin;
+  return baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState("user");
@@ -84,11 +90,12 @@ export function AuthProvider({ children }) {
           return { error: null, role: localUser.role };
         }
 
+        const redirectBaseUrl = getAuthRedirectBaseUrl();
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/email-confirmed`,
+            emailRedirectTo: `${redirectBaseUrl}/email-confirmed`,
             data: {
               full_name: fullName,
               role: "user"
