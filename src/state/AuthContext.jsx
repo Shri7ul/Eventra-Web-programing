@@ -29,29 +29,47 @@ export function AuthProvider({ children }) {
     async function resolveRole(sessionUser) {
       if (!sessionUser) return "user";
 
-      const metadataRole = sessionUser.user_metadata?.role;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", sessionUser.id)
-        .maybeSingle();
+      try {
+        const metadataRole = sessionUser.user_metadata?.role;
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", sessionUser.id)
+          .maybeSingle();
 
-      return profile?.role || metadataRole || "user";
+        return profile?.role || metadataRole || "user";
+      } catch {
+        return sessionUser.user_metadata?.role || "user";
+      }
     }
 
-    supabase.auth.getSession().then(async ({ data }) => {
-      const sessionUser = data.session?.user ?? null;
+    async function syncSession(sessionUser) {
       setUser(sessionUser);
       setRole(await resolveRole(sessionUser));
-      setLoading(false);
-    });
+    }
+
+    supabase.auth
+      .getSession()
+      .then(async ({ data }) => {
+        await syncSession(data.session?.user ?? null);
+      })
+      .catch(() => {
+        setUser(null);
+        setRole("user");
+      })
+      .finally(() => {
+        setLoading(false);
+      });
 
     const {
       data: { subscription }
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const sessionUser = session?.user ?? null;
-      setUser(sessionUser);
-      setRole(await resolveRole(sessionUser));
+      try {
+        await syncSession(session?.user ?? null);
+      } catch {
+        setUser(null);
+        setRole("user");
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -124,7 +142,15 @@ export function AuthProvider({ children }) {
           return;
         }
 
-        await supabase.auth.signOut();
+        setUser(null);
+        setRole("user");
+        setLoading(false);
+
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          // Force local sign-out behavior even if the network call fails.
+        }
       }
     }),
     [user, role, loading]

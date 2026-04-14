@@ -11,7 +11,10 @@ export default function UserDashboardPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     getUserRegistrations(user.id)
       .then(setRows)
       .catch((e) => {
