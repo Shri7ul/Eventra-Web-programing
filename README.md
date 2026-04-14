@@ -52,8 +52,8 @@ The provided schema already includes practical demo policies:
 
 ## Demo roles
 
-- User account: register with role `user`
-- Admin account: register with role `admin`
+- User account: sign up creates a user account by default
+- Admin account: use an existing admin account or the local fallback admin demo login
 - In local fallback mode, logging in with an email that includes `admin` grants admin role.
 
 ## Notes

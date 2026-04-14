@@ -6,7 +6,6 @@ export default function SignupPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("user");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const { signup } = useAuth();
@@ -27,18 +26,14 @@ export default function SignupPage() {
     }
 
     setSubmitting(true);
-    const result = await signup({ fullName, email, password, role });
+    const result = await signup({ fullName, email, password });
     if (result.error) {
       setError(result.error.message);
       setSubmitting(false);
       return;
     }
 
-    if (role === "admin") {
-      navigate("/admin", { state: { message: "Account created. Welcome to the admin dashboard." } });
-    } else {
-      navigate("/events", { state: { message: "Account created. Explore events and register for your first ticket." } });
-    }
+    navigate("/check-email", { state: { email } });
   }
 
   return (
@@ -50,13 +45,6 @@ export default function SignupPage() {
           <input className="px-4 py-3 bg-surface-container-highest rounded-lg" onChange={(e) => setFullName(e.target.value)} placeholder="Full name" required value={fullName} />
           <input className="px-4 py-3 bg-surface-container-highest rounded-lg" onChange={(e) => setEmail(e.target.value)} placeholder="Email" required type="email" value={email} />
           <input className="px-4 py-3 bg-surface-container-highest rounded-lg" onChange={(e) => setPassword(e.target.value)} placeholder="Password" required type="password" value={password} />
-          <select className="px-4 py-3 bg-surface-container-highest rounded-lg" onChange={(e) => setRole(e.target.value)} value={role}>
-            <option value="user">User</option>
-            <option value="admin">Admin</option>
-          </select>
-          <p className="md:col-span-2 text-xs text-on-surface-variant bg-surface-container-low px-3 py-2 rounded-lg">
-            Select Admin only for presentation or testing flows.
-          </p>
           {error ? <p className="text-error md:col-span-2">{error}</p> : null}
           <button className="md:col-span-2 bg-signature-gradient text-white py-4 rounded-full font-bold" disabled={submitting} type="submit">
             {submitting ? "Creating account..." : "Sign Up"}

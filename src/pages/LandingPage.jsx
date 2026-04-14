@@ -1,7 +1,54 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import PublicNav from "../components/PublicNav";
+import { listBackendEvents } from "../lib/eventService";
 
 export default function LandingPage() {
+  const [featuredEvents, setFeaturedEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadFeaturedEvents() {
+      try {
+        const rows = await listBackendEvents();
+        if (!isActive) return;
+        setFeaturedEvents((rows || []).slice(0, 3));
+      } catch (loadError) {
+        if (!isActive) return;
+        setError(loadError?.message || "Failed to load featured events.");
+        setFeaturedEvents([]);
+      } finally {
+        if (isActive) setLoading(false);
+      }
+    }
+
+    loadFeaturedEvents();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  function formatDate(dateValue) {
+    if (!dateValue) return "Date TBD";
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) return dateValue;
+    return new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric"
+    }).format(date);
+  }
+
+  function formatPrice(priceValue) {
+    const numericPrice = Number(priceValue);
+    if (!Number.isFinite(numericPrice) || numericPrice <= 0) return "Free";
+    return `$${numericPrice.toFixed(2)}`;
+  }
+
   return (
     <div className="bg-surface scroll-smooth">
       <PublicNav />
@@ -74,7 +121,7 @@ export default function LandingPage() {
               <div>
                 <h2 className="font-headline headline-sm text-4xl font-bold mb-4">Featured Events</h2>
                 <p className="font-body text-on-surface-variant max-w-md">
-                  Hand-picked premium experiences curated just for you.
+                  Live events pulled from the Explore feed.
                 </p>
               </div>
               <Link
@@ -85,37 +132,51 @@ export default function LandingPage() {
               </Link>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {[
-                { id: 1, category: "Music", date: "Oct 24, 2024", title: "Midnight Symphony Festival", price: "$89.00", img: "https://lh3.googleusercontent.com/aida-public/AB6AXuCL7RCXxlxbU5WMZnodYIav7-Iv69XspSBuo7q5Aooa_iseIfA_rjC14cbPGWvNG_UavYz3quQ6C7zaZyW30NtpQLZp-RSpL0ef8rlrDyH8jkZwP3Vq375RyzJU-HsJndaRz_tgVUWuY-YATkYhnecnz0iOvtlRb9Og_Ozz_cf7y3nxBzMZpRNIJ57mpvi4AuelsC1DcqmT_Sh6T5GtXdvFEiyhINz7peffAdTRzwFJQmXwoY8lpP6ssjYbeh0RU84RXIpgpIp6ESQ" },
-                { id: 2, category: "Tech", date: "Nov 12, 2024", title: "Future of AI Summit", price: "$149.00", img: "https://lh3.googleusercontent.com/aida-public/AB6AXuAF3IDfpmVQZ9cX0tyNtHWpQsLYZsnfiT4YeF5ia85MKK_41ys3FpKtbqoVtr4GhUOvVHnDRvQe7qhhu-KlgUIUkqlJbaMyDjnf_qn3TbJ4qR6DI-jllLZ11839uEPVwzivCD8vJLrLGSQ5454GnezYSGgiQUOJEz5XlEPwXxDmmtAn_UoROzsWpwktNxwSMD_yRSMNwMQPccydWa4jhCjnUy1SFev8rbsr87l1_NRlK_UpPPymSiyG3rFGw9WAb45mUHfIOVzXlfk" },
-                { id: 3, category: "Art", date: "Dec 05, 2024", title: "Metropolitan Art Expo", price: "Free", img: "https://lh3.googleusercontent.com/aida-public/AB6AXuBpgc4dVtqcYXfgeYjJH2wgazx8TnMNzTTmVcATYt18qrajxnpTfo0_W-i5RkcEEJ59f-2Lyv8LOh49-p4zEOiXyPdfjbvtrWCmCfVyuEqose1b54HtO_upU0zJLq-rDXkfNCjcBaEBHWQwCF544Xnm1e3IY_y_90IApSlA-RFuz-6p7JcXB1XZTH5eUtrWq8pAV6MCZdI0-EQ1p9cCSn2O9YDMTAVCYb_Jbx-TjXSWOVFqYJUg9umqih3YIQW3A0vu6aMcewfiTq4" },
-              ].map((event) => (
-                <div key={event.id} className="bg-surface-container-lowest rounded-xl overflow-hidden hover:translate-y-[-8px] transition-all duration-300">
-                  <div className="aspect-video relative overflow-hidden">
-                    <img className="w-full h-full object-cover" src={event.img} />
-                    <div className="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-primary">
-                      {event.category}
+            {error ? <p className="mb-6 text-sm text-error">{error}</p> : null}
+
+            {loading ? (
+              <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-8 text-center text-on-surface-variant">
+                Loading featured events...
+              </div>
+            ) : featuredEvents.length === 0 ? (
+              <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-8 text-center text-on-surface-variant">
+                No featured events available right now.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {featuredEvents.map((event) => (
+                  <div key={event.id} className="bg-surface-container-lowest rounded-xl overflow-hidden hover:translate-y-[-8px] transition-all duration-300">
+                    <div className="aspect-video relative overflow-hidden bg-surface-container">
+                      {event.image_url ? (
+                        <img className="w-full h-full object-cover" src={event.image_url} alt={event.title || "Featured event"} />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-on-surface-variant">
+                          <span className="material-symbols-outlined text-4xl">image_not_supported</span>
+                        </div>
+                      )}
+                      <div className="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-primary">
+                        {event.category || "General"}
+                      </div>
+                    </div>
+                    <div className="p-8">
+                      <div className="flex items-center gap-2 text-primary font-bold text-sm mb-2">
+                        <span className="material-symbols-outlined text-sm" data-icon="calendar_today">
+                          calendar_today
+                        </span>
+                        {formatDate(event.date)}
+                      </div>
+                      <h3 className="text-xl font-bold mb-4">{event.title}</h3>
+                      <div className="flex items-center justify-between mt-auto pt-4">
+                        <span className="text-on-surface-variant font-medium">{formatPrice(event.price)}</span>
+                        <Link to={`/events/${event.id}`} className="text-primary font-bold flex items-center gap-1 hover:text-primary-container">
+                          Book Now <span className="material-symbols-outlined text-sm">chevron_right</span>
+                        </Link>
+                      </div>
                     </div>
                   </div>
-                  <div className="p-8">
-                    <div className="flex items-center gap-2 text-primary font-bold text-sm mb-2">
-                      <span className="material-symbols-outlined text-sm" data-icon="calendar_today">
-                        calendar_today
-                      </span>
-                      {event.date}
-                    </div>
-                    <h3 className="text-xl font-bold mb-4">{event.title}</h3>
-                    <div className="flex items-center justify-between mt-auto pt-4">
-                      <span className="text-on-surface-variant font-medium">{event.price}</span>
-                      <Link to={`/events/${event.id}`} className="text-primary font-bold flex items-center gap-1 hover:text-primary-container">
-                        Book Now <span className="material-symbols-outlined text-sm">chevron_right</span>
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 

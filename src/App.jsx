@@ -11,6 +11,8 @@ import EventDetailsPage from "./pages/EventDetailsPage";
 import EventListingPage from "./pages/EventListingPage";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
+import CheckEmailPage from "./pages/CheckEmailPage";
+import EmailConfirmedPage from "./pages/EmailConfirmedPage";
 import QrTicketPage from "./pages/QrTicketPage";
 import SignupPage from "./pages/SignupPage";
 import UserDashboardPage from "./pages/UserDashboardPage";
@@ -22,6 +24,9 @@ export default function App() {
       <Route element={<LandingPage />} path="/landing_page" />
       <Route element={<SignupPage />} path="/signup" />
       <Route element={<SignupPage />} path="/sign_up_page" />
+      <Route element={<CheckEmailPage />} path="/check-email" />
+      <Route element={<EmailConfirmedPage />} path="/email-confirmed" />
+      <Route element={<EmailConfirmedPage />} path="/auth/confirm" />
       <Route element={<LoginPage />} path="/login" />
       <Route element={<LoginPage />} path="/login_page" />
       <Route element={<EventListingPage />} path="/events" />

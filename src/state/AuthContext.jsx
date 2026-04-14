@@ -75,9 +75,9 @@ export function AuthProvider({ children }) {
         const signedInRole = profile?.role || data.user?.user_metadata?.role || "user";
         return { error, role: signedInRole };
       },
-      async signup({ fullName, email, password, role: inputRole }) {
+      async signup({ fullName, email, password }) {
         if (!hasSupabase) {
-          const localUser = { id: email, email, fullName, role: inputRole || "user" };
+          const localUser = { id: email, email, fullName, role: "user" };
           localStorage.setItem("eventra-user", JSON.stringify(localUser));
           setUser(localUser);
           setRole(localUser.role);
@@ -88,13 +88,26 @@ export function AuthProvider({ children }) {
           email,
           password,
           options: {
+            emailRedirectTo: `${window.location.origin}/email-confirmed`,
             data: {
               full_name: fullName,
-              role: inputRole || "user"
+              role: "user"
             }
           }
         });
-        return { error, role: inputRole || "user" };
+        if (error) {
+          const message = String(error.message || "").toLowerCase();
+          if (error.status === 429 || error.statusCode === 429 || message.includes("rate limit") || message.includes("too many requests")) {
+            return {
+              error: {
+                message: "Email signup is temporarily rate-limited. Wait about a minute and try again with the same account request."
+              },
+              role: "user"
+            };
+          }
+        }
+
+        return { error, role: "user" };
       },
       async logout() {
         if (!hasSupabase) {

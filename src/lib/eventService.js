@@ -118,6 +118,28 @@ export async function listEvents() {
   }
 }
 
+export async function listBackendEvents() {
+  if (!hasSupabase) return [];
+
+  try {
+    const { data, error } = await withTimeout(
+      supabase
+        .from("events")
+        .select("*")
+        .eq("is_active", true)
+        .order("date", { ascending: true }),
+      10000,
+      "Loading events timed out."
+    );
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    if (isTimeoutOrNetworkError(error)) return [];
+    throw new Error(toFriendlyError(error, "Failed to load events"));
+  }
+}
+
 export async function getEventById(id) {
   if (!hasSupabase) return getLocalEvents().find((item) => item.id === id) || null;
 

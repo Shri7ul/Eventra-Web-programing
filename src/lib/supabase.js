@@ -6,5 +6,9 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 export const hasSupabase = Boolean(supabaseUrl && supabaseAnonKey);
 
 export const supabase = hasSupabase
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        detectSessionInUrl: false
+      }
+    })
   : null;
