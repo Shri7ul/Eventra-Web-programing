@@ -90,13 +90,7 @@ export function AuthProvider({ children }) {
         }
 
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", data.user?.id)
-          .maybeSingle();
-
-        const signedInRole = profile?.role || data.user?.user_metadata?.role || "user";
+        const signedInRole = data.user?.user_metadata?.role || "user";
         return { error, role: signedInRole };
       },
       async signup({ fullName, email, password }) {
