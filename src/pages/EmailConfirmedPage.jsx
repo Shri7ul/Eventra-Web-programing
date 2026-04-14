@@ -19,12 +19,22 @@ export default function EmailConfirmedPage() {
         return;
       }
 
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
       const code = searchParams.get("code");
       const tokenHash = searchParams.get("token_hash");
       const type = searchParams.get("type");
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+      const hashType = hashParams.get("type");
 
       try {
-        if (code) {
+        if (accessToken && refreshToken) {
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          });
+          if (error) throw error;
+        } else if (code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) throw error;
         } else if (tokenHash && type) {
@@ -33,11 +43,14 @@ export default function EmailConfirmedPage() {
             type
           });
           if (error) throw error;
+        } else if (accessToken || hashType === "signup") {
+          throw new Error("Unable to validate the email confirmation link.");
         }
 
         if (isActive) {
           setStatus("success");
           setMessage("Email confirmed successfully. Your account is ready.");
+          window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
         }
       } catch (error) {
         if (isActive) {
