@@ -9,6 +9,23 @@ function getAuthRedirectBaseUrl() {
   return baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
 }
 
+async function resolveRole(sessionUser) {
+  if (!sessionUser) return "user";
+
+  try {
+    const metadataRole = sessionUser.user_metadata?.role;
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", sessionUser.id)
+      .maybeSingle();
+
+    return profile?.role || metadataRole || "user";
+  } catch {
+    return sessionUser.user_metadata?.role || "user";
+  }
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState("user");
@@ -25,24 +42,6 @@ export function AuthProvider({ children }) {
       setLoading(false);
       return;
     }
-
-    async function resolveRole(sessionUser) {
-      if (!sessionUser) return "user";
-
-      try {
-        const metadataRole = sessionUser.user_metadata?.role;
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", sessionUser.id)
-          .maybeSingle();
-
-        return profile?.role || metadataRole || "user";
-      } catch {
-        return sessionUser.user_metadata?.role || "user";
-      }
-    }
-
     async function syncSession(sessionUser) {
       setUser(sessionUser);
       setRole(await resolveRole(sessionUser));
@@ -90,8 +89,9 @@ export function AuthProvider({ children }) {
         }
 
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        const signedInRole = data.user?.user_metadata?.role || "user";
+        let signedInRole = data.user?.user_metadata?.role || "user";
         if (!error && data.user) {
+          signedInRole = await resolveRole(data.user);
           setUser(data.user);
           setRole(signedInRole);
         }
