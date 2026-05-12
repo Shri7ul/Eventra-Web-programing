@@ -42,36 +42,61 @@ export function AuthProvider({ children }) {
       setLoading(false);
       return;
     }
+    function withTimeout(promise, timeoutMs, timeoutMessage) {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+        })
+      ]);
+    }
     async function syncSession(sessionUser) {
       setUser(sessionUser);
       setRole(await resolveRole(sessionUser));
     }
+    // Add a timeout so an unresolved network call doesn't leave the app stuck on "loading".
+    console.debug("AuthProvider: starting session sync");
+    let safetyTimer = setTimeout(() => {
+      console.warn("AuthProvider: loading timeout — forcing load false");
+      setLoading(false);
+    }, 12000);
 
-    supabase.auth
-      .getSession()
+    withTimeout(supabase.auth.getSession(), 8000, "Auth request timed out.")
       .then(async ({ data }) => {
+        console.debug("AuthProvider: getSession resolved", !!data?.session?.user);
         await syncSession(data.session?.user ?? null);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error("Auth session error:", err?.message || err);
         setUser(null);
         setRole("user");
       })
       .finally(() => {
+        clearTimeout(safetyTimer);
         setLoading(false);
       });
 
-    const {
-      data: { subscription }
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // Attach auth state change listener (be defensive about the return shape)
+    const onChange = supabase.auth.onAuthStateChange(async (event, session) => {
       try {
+        console.debug("AuthProvider: onAuthStateChange", event, !!session?.user);
         await syncSession(session?.user ?? null);
-      } catch {
+      } catch (err) {
+        console.error("Auth state sync error:", err?.message || err);
         setUser(null);
         setRole("user");
       }
     });
 
-    return () => subscription.unsubscribe();
+    const subscription = onChange?.data?.subscription || onChange?.subscription;
+
+    return () => {
+      try {
+        if (subscription && typeof subscription.unsubscribe === "function") subscription.unsubscribe();
+      } catch (err) {
+        // ignore unsubscribe errors
+      }
+    };
   }, []);
 
   const value = useMemo(

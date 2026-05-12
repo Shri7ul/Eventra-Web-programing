@@ -73,10 +73,15 @@ function isTimeoutOrNetworkError(error) {
 export async function listAdminEvents() {
   if (!hasSupabase) return getLocalEvents();
 
+  // If the browser is offline, return local events immediately to avoid long loading states
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return getLocalEvents();
+  }
+
   try {
     const { data, error } = await withTimeout(
       supabase.from("events").select("*").order("date", { ascending: true }),
-      10000,
+      7000,
       "Loading events timed out."
     );
     if (error) throw error;
@@ -95,6 +100,10 @@ export async function listAdminEvents() {
 export async function listEvents() {
   if (!hasSupabase) return getLocalEvents().filter((event) => event.is_active !== false);
 
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return getLocalEvents().filter((event) => event.is_active !== false);
+  }
+
   try {
     const { data, error } = await withTimeout(
       supabase
@@ -102,7 +111,7 @@ export async function listEvents() {
         .select("*")
         .eq("is_active", true)
         .order("date", { ascending: true }),
-      10000,
+      7000,
       "Loading events timed out."
     );
 
@@ -121,6 +130,8 @@ export async function listEvents() {
 export async function listBackendEvents() {
   if (!hasSupabase) return [];
 
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return [];
+
   try {
     const { data, error } = await withTimeout(
       supabase
@@ -128,7 +139,7 @@ export async function listBackendEvents() {
         .select("*")
         .eq("is_active", true)
         .order("date", { ascending: true }),
-      10000,
+      7000,
       "Loading events timed out."
     );
 
@@ -193,6 +204,7 @@ export async function createEvent(payload) {
     return data;
   } catch (error) {
     if (isTimeoutOrNetworkError(error)) {
+      console.warn("createEvent: network timeout or offline — saving event locally", error);
       const localEvent = {
         id: `evt-local-${Date.now()}`,
         ...insertPayload,
@@ -201,6 +213,13 @@ export async function createEvent(payload) {
       };
       const next = [localEvent, ...getLocalEvents()];
       localStorage.setItem(EVENTS_KEY, JSON.stringify(next));
+      try {
+        const unsynced = JSON.parse(localStorage.getItem("eventra-unsynced") || "[]");
+        unsynced.unshift(localEvent.id);
+        localStorage.setItem("eventra-unsynced", JSON.stringify(unsynced));
+      } catch (e) {
+        // ignore localStorage failures
+      }
       return localEvent;
     }
     throw new Error(toFriendlyError(error, "Failed to create event"));
@@ -270,6 +289,7 @@ export async function registerForEvent(eventId, user) {
     const record = {
       id: `reg-${Date.now()}`,
       user_id: user.id,
+      participant_name: user.fullName || user.full_name || user.name || user.email || "Unknown",
       event_id: eventId,
       ticket_code: `EVT-${Date.now().toString().slice(-6)}`,
       attendance_status: "pending",
@@ -352,7 +372,28 @@ export async function listAllRegistrations() {
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(toFriendlyError(error, "Failed to load participant list"));
-  return data || [];
+  const rows = data || [];
+
+  try {
+    const userIds = Array.from(new Set(rows.map((r) => r.user_id).filter(Boolean)));
+    if (userIds.length) {
+      const { data: profiles } = await supabase.from("profiles").select("id, full_name").in("id", userIds);
+      const profileMap = (profiles || []).reduce((acc, p) => {
+        acc[p.id] = p;
+        return acc;
+      }, {});
+
+      return rows.map((r) => ({
+        ...r,
+        participant_name: r.participant_name || profileMap[r.user_id]?.full_name || "Unknown"
+      }));
+    }
+  } catch (err) {
+    // ignore profile attach errors and return rows as-is
+    console.warn("listAllRegistrations: failed to load profiles", err?.message || err);
+  }
+
+  return rows;
 }
 
 export async function markAttendance(ticketCode, adminUserId = null) {
